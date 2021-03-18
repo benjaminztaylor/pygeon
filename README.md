@@ -4,6 +4,9 @@ Generating unique stimulus videos for pigeons.
 
 You can use either the `pygeon.py` file from the terminal *or* the jupyter notebook. I would recommend using the notebook for editing parameters and such, but if satisfied with existing parameters or expanding features, you might want to use the og-python file.
 
+## Output
+
+The program outputs 3 videos: 1 video will function as the fixation point screen (camera 3) and the other 2 will randomly switch between displaying a randomly selected shape. This code relies heavily on the skimage library for the generation and implementation.
 
 ## Installation
 
