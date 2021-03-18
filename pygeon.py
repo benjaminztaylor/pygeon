@@ -26,39 +26,11 @@ number_of_shapes = 10
 
 shapes = np.random.choice(shape_arr, number_of_shapes, p=[0.5,0.5])
 
-# This creates a blank image with the correct dims
-h, w = frame_size
-
-time_key = pd.DataFrame(shapes, columns=['stimulus_shape'])
-time_key['cameras'] = np.tile((1,2),int(number_of_shapes/2))
-time_key['duration'] = np.nan
-time_key.loc[time_key['stimulus_shape'] == cond_stim, 'duration'] = 21
-time_key.loc[time_key['stimulus_shape'] == other_stim, 'duration'] = 5
-
-# shift since first frame begins with fixation pt
-time_key.at[0,'duration'] = time_key.at[0,'duration'] + 16
-
-time_key['time'] = time_key['duration'].cumsum()
-time_key['times'] = pd.to_timedelta(time_key['time'], unit='m',)
-
-# Save times
-today = datetime.date.today()
-today = today.strftime("%d-%m-%Y")
-time_key_df_name = '{}_{}'.format(today, 'time_key.csv')
-time_key.to_csv(time_key_df_name)
-
-
 fix_img = np.full((h, w), 255, dtype = np.uint8)
 start = (540,960)
 extent = (590,1010)
 rr, cc = rectangle(start, end=extent, shape=fix_img.shape)
 fix_img[rr, cc] = 0
-
-
-#each holds camera images 
-cam1_images = []
-cam2_images = []
-cam3_images = []
 
 h, w = frame_size
 blank_img = np.full((h, w), 255, dtype = np.uint8)
@@ -94,93 +66,83 @@ def get_results(shapes,camera_images):
     camera_images.append(result_pad)
     append_single(camera_images, 4)
 
+# each holds camera images 
+cam1_images = []
+cam2_images = []
+cam3_images = []
+
+# order dfs for writing time keys
+time_order = []
+shape_order = []
 
 # Generates first frame
-
+append_single(cam3_images,1)
 cam3_fixation()
 append_multiple(cam1_images, cam2_images, 16)
 
 
 for cam1_shapes, cam2_shapes in zip(shapes, shapes[1:]):
-    # if camera 1 is condition stimulus shape 
-    if (cam1_shapes == cond_stim) & (cam2_shapes != cond_stim):
+    # randomly chooses between camera 1 and 2 
+    cam_array = ['cam1', 'cam2']
+    which_array = np.random.choice(cam_array, 1, p=[0.5,0.5])
+    # if camera 1 is chosen,
+    if which_array == 'cam1':
+        shape_order.append([cam1_shapes, 'fixation', cam2_shapes, 'fixation'])
+        time_order.append(['camera 1', 'fixation', 'camera 2', 'fixation'])
         get_results(cam1_shapes,cam1_images)
+        append_multiple(cam2_images, cam3_images, 5)
+        # camera 3 fixation
+        cam3_fixation()
 
-        # camera 2 and 3
-        append_multiple(cam2_images,cam3_images,5)
+        # for camera 1 and 2 (delay from fixation point)
+        append_multiple(cam1_images, cam2_images, 16)
+        get_results(cam2_shapes,cam2_images)
+        append_multiple(cam1_images, cam3_images, 5)
         # camera 3 only
         cam3_fixation()
-        # for camera 1 and 2 (delay from fixation point)
-        append_multiple(cam1_images,cam2_images,16)
-
-        # write camera2 after
-        get_results(cam2_shapes, cam2_images)
-        # camera 1 and 3 (blank images)
-        append_multiple(cam1_images,cam3_images,5)
-    # if camera 2 is condition stimulus shape
-    elif (cam2_shapes == cond_stim) & (cam1_shapes != cond_stim):
-        # write camera 1 first
-        get_results(cam1_shapes,cam1_images)
-        append_multiple(cam2_images,cam3_images,5)
-        # camera 1 and 3 (blank images)
+        append_multiple(cam1_images, cam2_images, 16)
+    # if camera 1 is chosen,
+    else:
+        shape_order.append([cam1_shapes, 'fixation', cam2_shapes, 'fixation'])
+        time_order.append(['camera 2', 'fixation', 'camera 1', 'fixation'])
         get_results(cam2_shapes,cam2_images)
-        append_multiple(cam1_images,cam3_images,5)
+        append_multiple(cam1_images, cam3_images, 5)
         # camera 3 only
         cam3_fixation()
         # for camera 1 and 2 (delay from fixation point)
         append_multiple(cam1_images, cam2_images, 16)
+        get_results(cam1_shapes,cam1_images)
+        append_multiple(cam2_images, cam3_images, 5)
+        # camera 3 only
+        cam3_fixation()
+        append_multiple(cam1_images, cam2_images, 16)
 
-    elif (cam2_shapes != cond_stim) & (cam1_shapes != cond_stim):
-        cam_array = ['cam1', 'cam2']
-        which_array = np.random.choice(cam_array, 1, p=[0.5,0.5])
 
-        if which_array == 'cam1':
-            get_results(cam1_shapes,cam1_images)
-            append_multiple(cam2_images, cam3_images, 5)
 
-            get_results(cam2_shapes,cam2_images)
-            append_multiple(cam1_images, cam3_images, 5)
+time_order = np.array(time_order)
+time_order = time_order.flatten()
+shape_order =  np.array(shape_order)
+shape_order =  shape_order.flatten()
 
-        else:
-            get_results(cam2_shapes,cam2_images)
-            append_multiple(cam1_images, cam3_images, 5)
+# generating timekey 
 
-            get_results(cam1_shapes,cam1_images)
-            append_multiple(cam2_images, cam3_images, 5)
+time_key = pd.DataFrame({'camera_order':time_order, 'shape_order':shape_order})
+time_key['duration'] = np.nan
+time_key.loc[time_key['shape_order']=='fixation', 'duration']= 16
+time_key.loc[time_key['shape_order']!='fixation', 'duration']= 5
+#time_key['cameras'] = np.tile((1,2),int(number_of_shapes/2))
+#time_key['duration'] = 16
 
-# if both are condition shapes select randomly which frame goes first
-    elif (cam2_shapes == cond_stim) & (cam1_shapes == cond_stim):
-        cam_array = ['cam1', 'cam2']
-        which_array = np.random.choice(cam_array, 1, p=[0.5,0.5])
+# shift since first frame begins with blank frame (1sec) + fixation pt (16sec) 
+time_key.at[0,'duration'] = time_key.at[0,'duration'] + 16
+time_key['time'] = time_key['duration'].cumsum()
+time_key['times'] = pd.to_timedelta(time_key['time'], unit='m')
 
-        if which_array == 'cam1':
-            get_results(cam1_shapes,cam1_images)
-            append_multiple(cam2_images, cam3_images, 5)
-            # camera 3 fixation
-            cam3_fixation()
-
-    # for camera 1 and 2 (delay from fixation point)
-            append_multiple(cam1_images, cam2_images, 16)
-            get_results(cam2_shapes,cam2_images)
-            append_multiple(cam1_images, cam3_images, 5)
-            # camera 3 only
-            cam3_fixation()
-            append_multiple(cam1_images, cam2_images, 16)
-        
-        else:
-            get_results(cam2_shapes,cam2_images)
-            append_multiple(cam1_images, cam3_images, 5)
-            # camera 3 only
-            cam3_fixation()
-            # for camera 1 and 2 (delay from fixation point)
-            append_multiple(cam1_images, cam2_images, 16)
-            get_results(cam1_shapes,cam1_images)
-            append_multiple(cam2_images, cam3_images, 5)
-            # camera 3 only
-            cam3_fixation()
-            append_multiple(cam1_images, cam2_images, 16)
-            # for camera 1 and 2 (delay from fixation point)
-
+# Save times
+today = datetime.date.today()
+today = today.strftime("%d-%m-%Y")
+time_key_df_name = '{}_{}'.format(today, 'time_key.csv')
+time_key.to_csv(time_key_df_name)
 
 # writing videos
 
